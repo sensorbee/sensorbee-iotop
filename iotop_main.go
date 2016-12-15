@@ -1,11 +1,14 @@
 package main
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
 	"os"
 	"strings"
+	"text/tabwriter"
 	"time"
+
+	"gopkg.in/sensorbee/sensorbee.v0/data"
 
 	"gopkg.in/sensorbee/sensorbee.v0/client"
 
@@ -123,41 +126,95 @@ func getNodeStatus(c *cli.Context) (string, error) {
 		return "", err
 	}
 
-	var js map[string]interface{}
-	res.ReadJSON(&js)
-	fmtRes, err := json.MarshalIndent(js, "", "  ")
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s", fmtRes), nil
-}
+	var status topologiesStatus
+	res.ReadJSON(&status)
 
-func newRequester(c *cli.Context) (*client.Requester, error) {
-	r, err := client.NewRequester(c.String("uri"), c.String("api-version"))
-	if err != nil {
-		return nil, fmt.Errorf("cannot create HTTP requester, %v", err)
-	}
-	return r, nil
-}
+	srcs := []sourceLine{}
+	boxes := []boxLine{}
+	sinks := []sinkLine{}
+	for _, tpl := range status.Topologies {
+		// TODO: in/out unit should be [tuples/sec]
 
-func do(c *cli.Context, method client.Method, path string, body interface{},
-	baseErrMsg string) (*client.Response, error) {
-	req, err := newRequester(c)
-	if err != nil {
-		return nil, fmt.Errorf("%v, %v", baseErrMsg, err)
-	}
-	res, err := req.Do(method, path, body)
-	if err != nil {
-		return nil, fmt.Errorf("%v, %v", baseErrMsg, err)
-	}
-	if res.IsError() {
-		errRes, err := res.Error()
-		if err != nil {
-			return nil, fmt.Errorf("%v and failed to parse error information, %v",
-				baseErrMsg, err)
+		for _, sn := range tpl.Souces {
+			line := sourceLine{
+				generalLine: &generalLine{
+					tplName:  tpl.Name,
+					name:     sn.Name,
+					nodeType: sn.NodeType,
+					state:    sn.State,
+				},
+			}
+			if out, err := sn.Status.Get(data.MustCompilePath(
+				"output_stats.num_sent_total")); err == nil {
+				outNum, _ := data.ToInt(out)
+				line.out = fmt.Sprintf("%d", outNum)
+			}
+			srcs = append(srcs, line)
 		}
-		return nil, fmt.Errorf("%v: %v, %v: %v", baseErrMsg, errRes.Code,
-			errRes.RequestID, errRes.Message)
+
+		for _, bn := range tpl.Boxes {
+			line := boxLine{
+				generalLine: &generalLine{
+					tplName:  tpl.Name,
+					name:     bn.Name,
+					nodeType: bn.NodeType,
+					state:    bn.State,
+				},
+			}
+			if in, err := bn.Status.Get(data.MustCompilePath(
+				"input_stats.num_received_total")); err == nil {
+				if out, err := bn.Status.Get(data.MustCompilePath(
+					"output_stats.num_sent_total")); err == nil {
+					inNum, _ := data.ToInt(in)
+					outNum, _ := data.ToInt(out)
+					line.inOut = fmt.Sprintf("%d", outNum-inNum)
+				}
+			}
+			// TODO: process time
+			boxes = append(boxes, line)
+		}
+
+		for _, sn := range tpl.Sinks {
+			line := sinkLine{
+				generalLine: &generalLine{
+					tplName:  tpl.Name,
+					name:     sn.Name,
+					nodeType: sn.NodeType,
+					state:    sn.State,
+				},
+			}
+			if in, err := sn.Status.Get(data.MustCompilePath(
+				"input_stats.num_received_total")); err == nil {
+				inNum, _ := data.ToInt(in)
+				line.in = fmt.Sprintf("%d", inNum)
+			}
+			sinks = append(sinks, line)
+		}
 	}
-	return res, nil
+
+	b := bytes.NewBuffer(nil)
+	w := tabwriter.NewWriter(b, 0, 0, 1, ' ', 0)
+	fmt.Fprintln(w, "TPLGY\tNAME\tNTYPE\tSTATE\tOUT")
+	for _, l := range srcs {
+		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%v",
+			l.tplName, l.name, l.nodeType, l.state, l.out)
+		fmt.Fprintln(w, values)
+	}
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "TPLGY\tNAME\tNTYPE\tSTATE\tINOUT")
+	for _, l := range boxes {
+		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%v",
+			l.tplName, l.name, l.nodeType, l.state, l.inOut)
+		fmt.Fprintln(w, values)
+	}
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "TPLGY\tNAME\tNTYPE\tSTATE\tIN")
+	for _, l := range sinks {
+		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%v",
+			l.tplName, l.name, l.nodeType, l.state, l.in)
+		fmt.Fprintln(w, values)
+	}
+
+	w.Flush()
+	return b.String(), nil
 }

@@ -21,4 +21,4 @@ this version, uses REST API, will be changed to use UDSF and websocket?
 ./sensorbee-iotop
 ```
 
-To stop, press "Esc"
+To stop, press "Ctrl+C" or "q"

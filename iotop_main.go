@@ -80,12 +80,13 @@ func Run(c *cli.Context) error {
 		}
 	}()
 
-loop:
-	for {
+	running := true
+	for running {
 		select {
 		case ev := <-eventQueue:
-			if ev.Type == termbox.EventKey && ev.Key == termbox.KeyEsc {
-				break loop
+			if ev.Type == termbox.EventKey &&
+				(ev.Key == termbox.KeyCtrlC || ev.Ch == 'q') {
+				running = false
 			}
 		default:
 			// nothing to do

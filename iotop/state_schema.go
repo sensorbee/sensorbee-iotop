@@ -1,4 +1,4 @@
-package main
+package iotop
 
 import (
 	"gopkg.in/sensorbee/sensorbee.v0/server/response"

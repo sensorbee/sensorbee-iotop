@@ -24,16 +24,20 @@ type generalLine struct {
 
 type sourceLine struct {
 	*generalLine
-	out string
+	out     string
+	dropped string
 }
 
 type boxLine struct {
 	*generalLine
 	processingTime string
 	inOut          string
+	dropped        string
+	nerror         string
 }
 
 type sinkLine struct {
 	*generalLine
-	in string
+	in     string
+	nerror string
 }

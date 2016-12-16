@@ -149,6 +149,11 @@ func getNodeStatus(c *cli.Context) (string, error) {
 				outNum, _ := data.ToInt(out)
 				line.out = fmt.Sprintf("%d", outNum)
 			}
+			if dropped, err := sn.Status.Get(data.MustCompilePath(
+				"output_stats.num_dropped")); err == nil {
+				droppedNum, _ := data.ToInt(dropped)
+				line.dropped = fmt.Sprintf("%d", droppedNum)
+			}
 			srcs = append(srcs, line)
 		}
 
@@ -171,6 +176,16 @@ func getNodeStatus(c *cli.Context) (string, error) {
 				}
 			}
 			// TODO: process time
+			if dropped, err := bn.Status.Get(data.MustCompilePath(
+				"output_stats.num_dropped")); err == nil {
+				droppedNum, _ := data.ToInt(dropped)
+				line.dropped = fmt.Sprintf("%d", droppedNum)
+			}
+			if nerror, err := bn.Status.Get(data.MustCompilePath(
+				"input_stats.num_errors")); err == nil {
+				nerrorNum, _ := data.ToInt(nerror)
+				line.nerror = fmt.Sprintf("%d", nerrorNum)
+			}
 			boxes = append(boxes, line)
 		}
 
@@ -188,30 +203,35 @@ func getNodeStatus(c *cli.Context) (string, error) {
 				inNum, _ := data.ToInt(in)
 				line.in = fmt.Sprintf("%d", inNum)
 			}
+			if nerror, err := sn.Status.Get(data.MustCompilePath(
+				"input_stats.num_errors")); err == nil {
+				nerrorNum, _ := data.ToInt(nerror)
+				line.nerror = fmt.Sprintf("%d", nerrorNum)
+			}
 			sinks = append(sinks, line)
 		}
 	}
 
 	b := bytes.NewBuffer(nil)
 	w := tabwriter.NewWriter(b, 0, 0, 1, ' ', 0)
-	fmt.Fprintln(w, "TPLGY\tNAME\tNTYPE\tSTATE\tOUT")
+	fmt.Fprintln(w, "TPLGY\tNAME\tNTYPE\tSTATE\tOUT\tDROP")
 	for _, l := range srcs {
-		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%v",
-			l.tplName, l.name, l.nodeType, l.state, l.out)
+		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v",
+			l.tplName, l.name, l.nodeType, l.state, l.out, l.dropped)
 		fmt.Fprintln(w, values)
 	}
 	fmt.Fprintln(w, "")
-	fmt.Fprintln(w, "TPLGY\tNAME\tNTYPE\tSTATE\tINOUT")
+	fmt.Fprintln(w, "TPLGY\tNAME\tNTYPE\tSTATE\tINOUT\tDROP\tERR")
 	for _, l := range boxes {
-		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%v",
-			l.tplName, l.name, l.nodeType, l.state, l.inOut)
+		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v\t%v",
+			l.tplName, l.name, l.nodeType, l.state, l.inOut, l.dropped, l.nerror)
 		fmt.Fprintln(w, values)
 	}
 	fmt.Fprintln(w, "")
-	fmt.Fprintln(w, "TPLGY\tNAME\tNTYPE\tSTATE\tIN")
+	fmt.Fprintln(w, "TPLGY\tNAME\tNTYPE\tSTATE\tIN\tERR")
 	for _, l := range sinks {
-		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%v",
-			l.tplName, l.name, l.nodeType, l.state, l.in)
+		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v",
+			l.tplName, l.name, l.nodeType, l.state, l.in, l.nerror)
 		fmt.Fprintln(w, values)
 	}
 

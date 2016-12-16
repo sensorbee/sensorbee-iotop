@@ -98,9 +98,10 @@ func Run(c *cli.Context) error {
 	return nil
 }
 
+const iotopTerminalColor = termbox.ColorDefault
+
 func draw(c *cli.Context) {
-	const coldef = termbox.ColorDefault
-	termbox.Clear(coldef, coldef)
+	termbox.Clear(iotopTerminalColor, iotopTerminalColor)
 
 	// test
 	msgs, err := getNodeStatus(c)
@@ -108,7 +109,7 @@ func draw(c *cli.Context) {
 		msgs = err.Error()
 	}
 	for i, msg := range strings.Split(msgs, "\n") {
-		tbprint(0, i, coldef, coldef, msg)
+		tbprint(0, i, iotopTerminalColor, iotopTerminalColor, msg)
 	}
 	termbox.Flush()
 }
@@ -119,6 +120,16 @@ func tbprint(x, y int, fg, bg termbox.Attribute, msg string) {
 		x += runewidth.RuneWidth(c)
 	}
 }
+
+var (
+	outputStatsNSentPath    = data.MustCompilePath("output_stats.num_sent_total")
+	outputStatsNDroppedPath = data.MustCompilePath("output_stats.num_dropped")
+	outputStatsOutputPath   = data.MustCompilePath("output_stats.outputs")
+	inputStatsNRcvPath      = data.MustCompilePath("input_stats.num_received_total")
+	inputStatsNErrPath      = data.MustCompilePath("input_stats.num_errors")
+	inputStatsInputPath     = data.MustCompilePath("input_stats.inputs")
+	dataMapDecloder         = data.NewDecoder(nil)
+)
 
 func getNodeStatus(c *cli.Context) (string, error) {
 	res, err := do(c, client.Get, "node_status", nil, "cannot access node status")
@@ -132,6 +143,7 @@ func getNodeStatus(c *cli.Context) (string, error) {
 	srcs := []sourceLine{}
 	boxes := []boxLine{}
 	sinks := []sinkLine{}
+	edges := map[string]*edgeLine{}
 	for _, tpl := range status.Topologies {
 		// TODO: in/out unit should be [tuples/sec]
 
@@ -144,17 +156,26 @@ func getNodeStatus(c *cli.Context) (string, error) {
 					state:    sn.State,
 				},
 			}
-			if out, err := sn.Status.Get(data.MustCompilePath(
-				"output_stats.num_sent_total")); err == nil {
+			if out, err := sn.Status.Get(outputStatsNSentPath); err == nil {
 				outNum, _ := data.ToInt(out)
 				line.out = fmt.Sprintf("%d", outNum)
 			}
-			if dropped, err := sn.Status.Get(data.MustCompilePath(
-				"output_stats.num_dropped")); err == nil {
+			if dropped, err := sn.Status.Get(outputStatsNDroppedPath); err == nil {
 				droppedNum, _ := data.ToInt(dropped)
 				line.dropped = fmt.Sprintf("%d", droppedNum)
 			}
 			srcs = append(srcs, line)
+
+			if outputs, err := sn.Status.Get(outputStatsOutputPath); err == nil {
+				outputMap, _ := data.AsMap(outputs)
+				for outName, output := range outputMap {
+					om, _ := data.AsMap(output)
+					line := getSourcePipeStatus(sn.Name, sn.NodeType, om)
+					line.receiverName = outName
+					key := fmt.Sprintf("%s|%s", sn.Name, outName)
+					edges[key] = line
+				}
+			}
 		}
 
 		for _, bn := range tpl.Boxes {
@@ -166,27 +187,45 @@ func getNodeStatus(c *cli.Context) (string, error) {
 					state:    bn.State,
 				},
 			}
-			if in, err := bn.Status.Get(data.MustCompilePath(
-				"input_stats.num_received_total")); err == nil {
-				if out, err := bn.Status.Get(data.MustCompilePath(
-					"output_stats.num_sent_total")); err == nil {
+			if in, err := bn.Status.Get(inputStatsNRcvPath); err == nil {
+				if out, err := bn.Status.Get(outputStatsNSentPath); err == nil {
 					inNum, _ := data.ToInt(in)
 					outNum, _ := data.ToInt(out)
 					line.inOut = fmt.Sprintf("%d", outNum-inNum)
 				}
 			}
 			// TODO: process time
-			if dropped, err := bn.Status.Get(data.MustCompilePath(
-				"output_stats.num_dropped")); err == nil {
+			if dropped, err := bn.Status.Get(outputStatsNDroppedPath); err == nil {
 				droppedNum, _ := data.ToInt(dropped)
 				line.dropped = fmt.Sprintf("%d", droppedNum)
 			}
-			if nerror, err := bn.Status.Get(data.MustCompilePath(
-				"input_stats.num_errors")); err == nil {
+			if nerror, err := bn.Status.Get(inputStatsNErrPath); err == nil {
 				nerrorNum, _ := data.ToInt(nerror)
 				line.nerror = fmt.Sprintf("%d", nerrorNum)
 			}
 			boxes = append(boxes, line)
+
+			if inputs, err := bn.Status.Get(inputStatsInputPath); err == nil {
+				inputMap, _ := data.AsMap(inputs)
+				for inName, input := range inputMap {
+					line, ok := edges[fmt.Sprintf("%s|%s", inName, bn.Name)]
+					if !ok {
+						continue // TODO: should not be ignored
+					}
+					im, _ := data.AsMap(input)
+					addDestinationPipeStatus(bn.NodeType, im, line)
+				}
+			}
+			if outputs, err := bn.Status.Get(outputStatsOutputPath); err == nil {
+				outputMap, _ := data.AsMap(outputs)
+				for outName, output := range outputMap {
+					om, _ := data.AsMap(output)
+					line := getSourcePipeStatus(bn.Name, bn.NodeType, om)
+					line.receiverName = outName
+					key := fmt.Sprintf("%s|%s", bn.Name, outName)
+					edges[key] = line
+				}
+			}
 		}
 
 		for _, sn := range tpl.Sinks {
@@ -198,22 +237,41 @@ func getNodeStatus(c *cli.Context) (string, error) {
 					state:    sn.State,
 				},
 			}
-			if in, err := sn.Status.Get(data.MustCompilePath(
-				"input_stats.num_received_total")); err == nil {
+			if in, err := sn.Status.Get(inputStatsNRcvPath); err == nil {
 				inNum, _ := data.ToInt(in)
 				line.in = fmt.Sprintf("%d", inNum)
 			}
-			if nerror, err := sn.Status.Get(data.MustCompilePath(
-				"input_stats.num_errors")); err == nil {
+			if nerror, err := sn.Status.Get(inputStatsNErrPath); err == nil {
 				nerrorNum, _ := data.ToInt(nerror)
 				line.nerror = fmt.Sprintf("%d", nerrorNum)
 			}
 			sinks = append(sinks, line)
+
+			if inputs, err := sn.Status.Get(inputStatsInputPath); err == nil {
+				inputMap, _ := data.AsMap(inputs)
+				for inName, input := range inputMap {
+					line, ok := edges[fmt.Sprintf("%s|%s", inName, sn.Name)]
+					if !ok {
+						continue // TODO: should not be ignored
+					}
+					im, _ := data.AsMap(input)
+					addDestinationPipeStatus(sn.NodeType, im, line)
+				}
+			}
 		}
 	}
 
 	b := bytes.NewBuffer(nil)
 	w := tabwriter.NewWriter(b, 0, 0, 1, ' ', 0)
+	fmt.Fprintln(w, "SENDER\tSTYPE\tRCVER\tRTYPE\tSQSIZE\tSQNUM\tSNUM\tRQSIZE\tRQNUM\tRNUM\tINOUT")
+	for _, l := range edges {
+		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t",
+			l.senderName, l.senderNodeType, l.receiverName, l.receiverNodeType,
+			l.senderQueueSize, l.senderQueued, l.sent,
+			l.receiverQueueSize, l.receiverQueued, l.received, l.inOut)
+		fmt.Fprintln(w, values)
+	}
+	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "TPLGY\tNAME\tNTYPE\tSTATE\tOUT\tDROP")
 	for _, l := range srcs {
 		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v",
@@ -237,4 +295,32 @@ func getNodeStatus(c *cli.Context) (string, error) {
 
 	w.Flush()
 	return b.String(), nil
+}
+
+func getSourcePipeStatus(name, nodeType string, output data.Map) *edgeLine {
+	line := &edgeLine{
+		senderName:     name,
+		senderNodeType: nodeType,
+	}
+	pipeSts := &sourcePipeStatus{}
+	if err := dataMapDecloder.Decode(output, pipeSts); err != nil {
+		return line
+	}
+	line.senderQueued = fmt.Sprintf("%d", pipeSts.NumQueued)
+	line.senderQueueSize = fmt.Sprintf("%d", pipeSts.QueueSize)
+	line.sent = fmt.Sprintf("%d", pipeSts.NumSent)
+	line.sentInt = pipeSts.NumSent
+	return line
+}
+
+func addDestinationPipeStatus(nodeType string, input data.Map, line *edgeLine) {
+	line.receiverNodeType = nodeType
+	pipeSts := &destinationPipeStatus{}
+	if err := dataMapDecloder.Decode(input, pipeSts); err != nil {
+		return
+	}
+	line.receiverQueued = fmt.Sprintf("%d", pipeSts.NumQueued)
+	line.receiverQueueSize = fmt.Sprintf("%d", pipeSts.QueueSize)
+	line.received = fmt.Sprintf("%d", pipeSts.NumReceived)
+	line.inOut = fmt.Sprintf("%d", pipeSts.NumReceived-line.sentInt)
 }

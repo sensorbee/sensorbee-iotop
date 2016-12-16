@@ -15,6 +15,18 @@ type topologyStatus struct {
 	Sinks  []response.Sink   `json:"sinks"`
 }
 
+type sourcePipeStatus struct {
+	NumQueued int
+	NumSent   int
+	QueueSize int
+}
+
+type destinationPipeStatus struct {
+	NumQueued   int
+	NumReceived int
+	QueueSize   int
+}
+
 type generalLine struct {
 	tplName  string
 	name     string
@@ -40,4 +52,19 @@ type sinkLine struct {
 	*generalLine
 	in     string
 	nerror string
+}
+
+type edgeLine struct {
+	senderName        string
+	senderNodeType    string
+	receiverName      string
+	receiverNodeType  string
+	senderQueueSize   string
+	senderQueued      string
+	sent              string
+	sentInt           int
+	receiverQueueSize string
+	receiverQueued    string
+	received          string
+	inOut             string
 }

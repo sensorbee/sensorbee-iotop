@@ -16,15 +16,15 @@ type topologyStatus struct {
 }
 
 type sourcePipeStatus struct {
-	NumQueued int
-	NumSent   int
-	QueueSize int
+	NumQueued int64
+	NumSent   int64
+	QueueSize int64
 }
 
 type destinationPipeStatus struct {
-	NumQueued   int
-	NumReceived int
-	QueueSize   int
+	NumQueued   int64
+	NumReceived int64
+	QueueSize   int64
 }
 
 type generalLine struct {
@@ -36,22 +36,22 @@ type generalLine struct {
 
 type sourceLine struct {
 	*generalLine
-	out     string
-	dropped string
+	out     int64
+	dropped int64
 }
 
 type boxLine struct {
 	*generalLine
-	processingTime string
-	inOut          string
-	dropped        string
-	nerror         string
+	processingTime int
+	inOut          int64
+	dropped        int64
+	nerror         int64
 }
 
 type sinkLine struct {
 	*generalLine
-	in     string
-	nerror string
+	in     int64
+	nerror int64
 }
 
 type edgeLine struct {
@@ -59,12 +59,11 @@ type edgeLine struct {
 	senderNodeType    string
 	receiverName      string
 	receiverNodeType  string
-	senderQueueSize   string
-	senderQueued      string
-	sent              string
-	sentInt           int
-	receiverQueueSize string
-	receiverQueued    string
-	received          string
-	inOut             string
+	senderQueueSize   int64
+	senderQueued      int64
+	sent              int64
+	receiverQueueSize int64
+	receiverQueued    int64
+	received          int64
+	inOut             int64
 }

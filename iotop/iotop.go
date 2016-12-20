@@ -121,11 +121,11 @@ func getNodeStatus(c *cli.Context) (string, error) {
 			}
 			if out, err := sn.Status.Get(outputStatsNSentPath); err == nil {
 				outNum, _ := data.ToInt(out)
-				line.out = fmt.Sprintf("%d", outNum)
+				line.out = outNum
 			}
 			if dropped, err := sn.Status.Get(outputStatsNDroppedPath); err == nil {
 				droppedNum, _ := data.ToInt(dropped)
-				line.dropped = fmt.Sprintf("%d", droppedNum)
+				line.dropped = droppedNum
 			}
 			srcs = append(srcs, line)
 
@@ -154,17 +154,17 @@ func getNodeStatus(c *cli.Context) (string, error) {
 				if out, err := bn.Status.Get(outputStatsNSentPath); err == nil {
 					inNum, _ := data.ToInt(in)
 					outNum, _ := data.ToInt(out)
-					line.inOut = fmt.Sprintf("%d", outNum-inNum)
+					line.inOut = outNum - inNum
 				}
 			}
 			// TODO: process time
 			if dropped, err := bn.Status.Get(outputStatsNDroppedPath); err == nil {
 				droppedNum, _ := data.ToInt(dropped)
-				line.dropped = fmt.Sprintf("%d", droppedNum)
+				line.dropped = droppedNum
 			}
 			if nerror, err := bn.Status.Get(inputStatsNErrPath); err == nil {
 				nerrorNum, _ := data.ToInt(nerror)
-				line.nerror = fmt.Sprintf("%d", nerrorNum)
+				line.nerror = nerrorNum
 			}
 			boxes = append(boxes, line)
 
@@ -202,11 +202,11 @@ func getNodeStatus(c *cli.Context) (string, error) {
 			}
 			if in, err := sn.Status.Get(inputStatsNRcvPath); err == nil {
 				inNum, _ := data.ToInt(in)
-				line.in = fmt.Sprintf("%d", inNum)
+				line.in = inNum
 			}
 			if nerror, err := sn.Status.Get(inputStatsNErrPath); err == nil {
 				nerrorNum, _ := data.ToInt(nerror)
-				line.nerror = fmt.Sprintf("%d", nerrorNum)
+				line.nerror = nerrorNum
 			}
 			sinks = append(sinks, line)
 
@@ -228,7 +228,7 @@ func getNodeStatus(c *cli.Context) (string, error) {
 	w := tabwriter.NewWriter(b, 0, 0, 1, ' ', 0)
 	fmt.Fprintln(w, "SENDER\tSTYPE\tRCVER\tRTYPE\tSQSIZE\tSQNUM\tSNUM\tRQSIZE\tRQNUM\tRNUM\tINOUT")
 	for _, l := range edges {
-		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t",
+		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%d\t%d\t%d\t%d\t%d\t%d\t%d",
 			l.senderName, l.senderNodeType, l.receiverName, l.receiverNodeType,
 			l.senderQueueSize, l.senderQueued, l.sent,
 			l.receiverQueueSize, l.receiverQueued, l.received, l.inOut)
@@ -237,21 +237,21 @@ func getNodeStatus(c *cli.Context) (string, error) {
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "TPLGY\tNAME\tNTYPE\tSTATE\tOUT\tDROP")
 	for _, l := range srcs {
-		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v",
+		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%d\t%d",
 			l.tplName, l.name, l.nodeType, l.state, l.out, l.dropped)
 		fmt.Fprintln(w, values)
 	}
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "TPLGY\tNAME\tNTYPE\tSTATE\tINOUT\tDROP\tERR")
 	for _, l := range boxes {
-		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v\t%v",
+		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%d\t%d\t%d",
 			l.tplName, l.name, l.nodeType, l.state, l.inOut, l.dropped, l.nerror)
 		fmt.Fprintln(w, values)
 	}
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "TPLGY\tNAME\tNTYPE\tSTATE\tIN\tERR")
 	for _, l := range sinks {
-		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v",
+		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%d\t%d",
 			l.tplName, l.name, l.nodeType, l.state, l.in, l.nerror)
 		fmt.Fprintln(w, values)
 	}
@@ -269,10 +269,9 @@ func getSourcePipeStatus(name, nodeType string, output data.Map) *edgeLine {
 	if err := dataMapDecloder.Decode(output, pipeSts); err != nil {
 		return line
 	}
-	line.senderQueued = fmt.Sprintf("%d", pipeSts.NumQueued)
-	line.senderQueueSize = fmt.Sprintf("%d", pipeSts.QueueSize)
-	line.sent = fmt.Sprintf("%d", pipeSts.NumSent)
-	line.sentInt = pipeSts.NumSent
+	line.senderQueued = pipeSts.NumQueued
+	line.senderQueueSize = pipeSts.QueueSize
+	line.sent = pipeSts.NumSent
 	return line
 }
 
@@ -282,8 +281,8 @@ func addDestinationPipeStatus(nodeType string, input data.Map, line *edgeLine) {
 	if err := dataMapDecloder.Decode(input, pipeSts); err != nil {
 		return
 	}
-	line.receiverQueued = fmt.Sprintf("%d", pipeSts.NumQueued)
-	line.receiverQueueSize = fmt.Sprintf("%d", pipeSts.QueueSize)
-	line.received = fmt.Sprintf("%d", pipeSts.NumReceived)
-	line.inOut = fmt.Sprintf("%d", pipeSts.NumReceived-line.sentInt)
+	line.receiverQueued = pipeSts.NumQueued
+	line.receiverQueueSize = pipeSts.QueueSize
+	line.received = pipeSts.NumReceived
+	line.inOut = pipeSts.NumReceived - line.sent
 }

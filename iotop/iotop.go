@@ -134,6 +134,7 @@ func getNodeStatus(c *cli.Context) (string, error) {
 				for outName, output := range outputMap {
 					om, _ := data.AsMap(output)
 					line := getSourcePipeStatus(sn.Name, sn.NodeType, om)
+					line.tplName = tpl.Name
 					line.receiverName = outName
 					key := fmt.Sprintf("%s|%s", sn.Name, outName)
 					edges[key] = line
@@ -184,6 +185,7 @@ func getNodeStatus(c *cli.Context) (string, error) {
 				for outName, output := range outputMap {
 					om, _ := data.AsMap(output)
 					line := getSourcePipeStatus(bn.Name, bn.NodeType, om)
+					line.tplName = tpl.Name
 					line.receiverName = outName
 					key := fmt.Sprintf("%s|%s", bn.Name, outName)
 					edges[key] = line
@@ -226,11 +228,11 @@ func getNodeStatus(c *cli.Context) (string, error) {
 
 	b := bytes.NewBuffer(nil)
 	w := tabwriter.NewWriter(b, 0, 0, 1, ' ', 0)
-	fmt.Fprintln(w, "SENDER\tSTYPE\tRCVER\tRTYPE\tSQSIZE\tSQNUM\tSNUM\tRQSIZE\tRQNUM\tRNUM\tINOUT")
+	fmt.Fprintln(w, "TPLGY\tSENDER\tSTYPE\tRCVER\tRTYPE\tSQSIZE\tSQNUM\tSNUM\tRQSIZE\tRQNUM\tRNUM\tINOUT")
 	for _, l := range edges {
-		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%d\t%d\t%d\t%d\t%d\t%d\t%d",
-			l.senderName, l.senderNodeType, l.receiverName, l.receiverNodeType,
-			l.senderQueueSize, l.senderQueued, l.sent,
+		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%d\t%d\t%d\t%d\t%d\t%d\t%d",
+			l.tplName, l.senderName, l.senderNodeType, l.receiverName,
+			l.receiverNodeType, l.senderQueueSize, l.senderQueued, l.sent,
 			l.receiverQueueSize, l.receiverQueued, l.received, l.inOut)
 		fmt.Fprintln(w, values)
 	}

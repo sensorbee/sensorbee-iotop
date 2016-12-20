@@ -55,6 +55,7 @@ type sinkLine struct {
 }
 
 type edgeLine struct {
+	tplName           string
 	senderName        string
 	senderNodeType    string
 	receiverName      string

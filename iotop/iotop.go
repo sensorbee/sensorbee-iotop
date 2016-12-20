@@ -39,9 +39,17 @@ func Run(c *cli.Context) error {
 	}()
 
 	tick := time.Tick(time.Duration(d*1000) * time.Millisecond)
+	errChan := make(chan error)
+	defer close(errChan)
 	go func() {
 		for {
-			draw(c)
+			status, err := getNodeStatus(c)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			lines := convertNodeStatus(status)
+			draw(lines)
 			<-tick
 		}
 	}()
@@ -54,6 +62,8 @@ func Run(c *cli.Context) error {
 				(ev.Key == termbox.KeyCtrlC || ev.Ch == 'q') {
 				running = false
 			}
+		case err := <-errChan:
+			return fmt.Errorf(err.Error())
 		default:
 			// nothing to do
 		}
@@ -63,16 +73,10 @@ func Run(c *cli.Context) error {
 
 const iotopTerminalColor = termbox.ColorDefault
 
-func draw(c *cli.Context) {
+func draw(lines string) {
 	termbox.Clear(iotopTerminalColor, iotopTerminalColor)
-
-	// test
-	msgs, err := getNodeStatus(c)
-	if err != nil {
-		msgs = err.Error()
-	}
-	for i, msg := range strings.Split(msgs, "\n") {
-		tbprint(0, i, iotopTerminalColor, iotopTerminalColor, msg)
+	for i, line := range strings.Split(lines, "\n") {
+		tbprint(0, i, iotopTerminalColor, iotopTerminalColor, line)
 	}
 	termbox.Flush()
 }
@@ -94,15 +98,17 @@ var (
 	dataMapDecloder         = data.NewDecoder(nil)
 )
 
-func getNodeStatus(c *cli.Context) (string, error) {
+func getNodeStatus(c *cli.Context) (*topologiesStatus, error) {
 	res, err := do(c, client.Get, "node_status", nil, "cannot access node status")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-
 	var status topologiesStatus
 	res.ReadJSON(&status)
+	return &status, nil
+}
 
+func convertNodeStatus(status *topologiesStatus) string {
 	srcs := []sourceLine{}
 	boxes := []boxLine{}
 	sinks := []sinkLine{}
@@ -259,7 +265,7 @@ func getNodeStatus(c *cli.Context) (string, error) {
 	}
 
 	w.Flush()
-	return b.String(), nil
+	return b.String()
 }
 
 func getSourcePipeStatus(name, nodeType string, output data.Map) *edgeLine {

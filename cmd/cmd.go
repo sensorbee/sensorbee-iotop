@@ -2,7 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"pfi/sensorbee/dimo-sensorbee/server/config"
+
+	"gopkg.in/sensorbee/sensorbee.v0/server/config"
 
 	"github.com/sensorbee/sensorbee-iotop/iotop"
 	"gopkg.in/urfave/cli.v1"

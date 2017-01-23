@@ -1,18 +1,30 @@
 package iotop
 
 import (
-	"gopkg.in/sensorbee/sensorbee.v0/server/response"
+	"time"
+
+	"gopkg.in/sensorbee/sensorbee.v0/data"
 )
 
-type topologiesStatus struct {
-	Topologies []topologyStatus `json:"topologies"`
+type nodeStatus struct {
+	NodeName    string      `bql:"node_name"`
+	NodeType    string      `bql:"node_type"`
+	State       string      `bql:"state"`
+	OutputStats outputStats `bql:"output_stats"`
+	InputStats  inputStats  `bql:"input_stats"`
+	Timestamp   time.Time   `bql:"ts"`
 }
 
-type topologyStatus struct {
-	Name   string            `json:"name"`
-	Souces []response.Source `json:"sources"`
-	Boxes  []response.Stream `json:"boxes"`
-	Sinks  []response.Sink   `json:"sinks"`
+type outputStats struct {
+	NumSentTotal int64    `bql:"num_sent_total`
+	NumDropped   int64    `bql:"num_dropped"`
+	Outputs      data.Map `bql:"outputs"`
+}
+
+type inputStats struct {
+	NumReceivedTotal int64    `bql:"num_received_total`
+	NumErrors        int64    `bql:"num_errors"`
+	Inputs           data.Map `bql:"inputs"`
 }
 
 type sourcePipeStatus struct {
@@ -28,7 +40,6 @@ type destinationPipeStatus struct {
 }
 
 type generalLine struct {
-	tplName  string
 	name     string
 	nodeType string
 	state    string
@@ -55,7 +66,6 @@ type sinkLine struct {
 }
 
 type edgeLine struct {
-	tplName           string
 	senderName        string
 	senderNodeType    string
 	receiverName      string

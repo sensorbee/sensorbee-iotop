@@ -4,17 +4,6 @@ so interface and API will be changed
 
 # sensorbee-iotop
 
-**memo**
-
-path: `$GOPATH/src/github.com/sensorbee/sensorbee-iotop`
-
-this version, uses REST API, will be changed to use UDSF and websocket?
-
-## required
-
-* SensorBee: https://github.com/disktnk/sensorbee/tree/node-api
-    * add `/node_status` API
-
 ## build & run
 
 **single binary version**
@@ -22,7 +11,7 @@ this version, uses REST API, will be changed to use UDSF and websocket?
 ```bash
 $ cd $GOPATH/src/github.com/sensorbee/sensorbee-iotop
 $ go build
-$ ./sensorbee-iotop
+$ ./sensorbee-iotop -t <topology_name>
 ```
 
 **run as sensorbee command**
@@ -36,17 +25,17 @@ commands:
 ```
 
 ```bash
-$ build_sensorbee --download-plugins=false
-$ ./sensorbee iotop
+$ build_sensorbee
+$ ./sensorbee iotop -t <topology_name>
 ```
 
 ## usage
 
 **option**
 
-- `d`: interval time [sec], default to 5 [sec]
-- `uri`: URI address of target SensorBee server, default to "http://localhost:<default_port>/"
-- `api-version`: version of SensorBee API, default to "v1"
+- `-d`: interval time [sec], default to 5 [sec]
+- `--uri`: URI address of target SensorBee server, default to "http://localhost:<default_port\>/"
+- `--api-version`: version of SensorBee API, default to "v1"
 
 **operation**
 

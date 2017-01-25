@@ -78,7 +78,7 @@ func (h *lineHolder) push(m data.Map) error {
 		// TODO: BQL statement, when SELETE query
 		h.boxes = append(h.boxes, line)
 		h.setSourcePipeStatus(ns.NodeName, ns.NodeType, ns.OutputStats.Outputs)
-		h.addDestinationPipeStatus(ns.NodeName, ns.NodeType, ns.InputStats.Inputs)
+		h.setDestinationPipeStatus(ns.NodeName, ns.NodeType, ns.InputStats.Inputs)
 
 	case "sink":
 		line := sinkLine{
@@ -87,7 +87,7 @@ func (h *lineHolder) push(m data.Map) error {
 			nerror:      ns.InputStats.NumErrors,
 		}
 		h.sinks = append(h.sinks, line)
-		h.addDestinationPipeStatus(ns.NodeName, ns.NodeType, ns.InputStats.Inputs)
+		h.setDestinationPipeStatus(ns.NodeName, ns.NodeType, ns.InputStats.Inputs)
 	}
 	return nil
 }
@@ -137,43 +137,52 @@ func (h *lineHolder) setSourcePipeStatus(name, nodeType string, outputs data.Map
 	}
 	for outName, output := range outputs {
 		om, _ := data.AsMap(output)
-		line := &edgeLine{
-			senderName:     name,
-			senderNodeType: nodeType,
-		}
-
 		pipeSts := &sourcePipeStatus{}
 		if err := h.decoder.Decode(om, pipeSts); err != nil {
 			return
 		}
+
+		key := fmt.Sprintf("%s|%s", name, outName)
+		line, ok := h.edges[key]
+		if !ok {
+			line = &edgeLine{}
+			h.edges[key] = line
+		} else {
+			line.inOut = line.received - pipeSts.NumSent
+		}
+		line.senderName = name
+		line.senderNodeType = nodeType
+
 		line.senderQueued = pipeSts.NumQueued
 		line.senderQueueSize = pipeSts.QueueSize
 		line.sent = pipeSts.NumSent
-		line.receiverName = outName
-		key := fmt.Sprintf("%s|%s", name, outName)
-		h.edges[key] = line
 	}
 }
 
-func (h *lineHolder) addDestinationPipeStatus(name, nodeType string, inputs data.Map) {
+func (h *lineHolder) setDestinationPipeStatus(name, nodeType string, inputs data.Map) {
 	if len(inputs) == 0 {
 		return
 	}
 	for inName, input := range inputs {
-		line, ok := h.edges[fmt.Sprintf("%s|%s", inName, name)]
-		if !ok {
-			continue // TODO: shoud not be ignored
-		}
-		line.receiverNodeType = nodeType
-
 		im, _ := data.AsMap(input)
 		pipeSts := &destinationPipeStatus{}
 		if err := h.decoder.Decode(im, pipeSts); err != nil {
 			return
 		}
+
+		key := fmt.Sprintf("%s|%s", inName, name)
+		line, ok := h.edges[key]
+		if !ok {
+			line = &edgeLine{}
+			h.edges[key] = line
+		} else {
+			line.inOut = pipeSts.NumReceived - line.sent
+		}
+		line.receiverName = name
+		line.receiverNodeType = nodeType
+
 		line.receiverQueued = pipeSts.NumQueued
 		line.receiverQueueSize = pipeSts.QueueSize
 		line.received = pipeSts.NumReceived
-		line.inOut = pipeSts.NumReceived - line.sent
 	}
 }

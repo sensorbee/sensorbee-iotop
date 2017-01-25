@@ -9,6 +9,7 @@ import (
 	"gopkg.in/urfave/cli.v1"
 )
 
+// SetUp iotop command.
 func SetUp() cli.Command {
 	cmd := cli.Command{
 		Name:        "iotop",

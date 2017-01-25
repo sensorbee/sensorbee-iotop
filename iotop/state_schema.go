@@ -16,13 +16,13 @@ type nodeStatus struct {
 }
 
 type outputStats struct {
-	NumSentTotal int64    `bql:"num_sent_total`
+	NumSentTotal int64    `bql:"num_sent_total"`
 	NumDropped   int64    `bql:"num_dropped"`
 	Outputs      data.Map `bql:"outputs"`
 }
 
 type inputStats struct {
-	NumReceivedTotal int64    `bql:"num_received_total`
+	NumReceivedTotal int64    `bql:"num_received_total"`
 	NumErrors        int64    `bql:"num_errors"`
 	Inputs           data.Map `bql:"inputs"`
 }

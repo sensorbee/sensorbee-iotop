@@ -17,36 +17,37 @@ func Run(c *cli.Context) error {
 	// TODO: check os.Stdout().Fd() is terminal or not
 	// ref: github.com/mattn/go-isatty
 
-	d := c.Float64("d")
-	if d < 1.0 {
-		return fmt.Errorf("interval must be over than 1[sec]")
-	}
-
-	if err := termbox.Init(); err != nil {
-		return fmt.Errorf("fail to initialize termbox, %v", err)
-	}
-	defer termbox.Close()
-
-	eventQueue := make(chan termbox.Event)
-	go func() {
-		for {
-			eventQueue <- termbox.PollEvent()
-		}
-	}()
-
-	lh := newLineHolder()
-
-	ns, err := newNodeStatuser(c.String("uri"), c.String("api-version"),
+	req, err := newNodeStatusRequester(c.String("uri"), c.String("api-version"),
 		c.String("topology"))
 	if err != nil {
 		return err
 	}
-	ch, err := ns.selectNodeStatus(1.0)
+
+	d := c.Float64("d")
+	if d < 1.0 {
+		return fmt.Errorf("interval must be over than 1[sec]")
+	}
+	return Monitor(d, req)
+}
+
+// Monitor I/O of each nodes.
+func Monitor(d float64, req StatusRequester) error {
+	if err := setupStatusQuery(req, 1.0); err != nil {
+		return err
+	}
+	defer tearDownStatusQuery(req) //TODO: skip error
+	res, err := selectNodeStatus(req)
 	if err != nil {
 		return err
 	}
-	defer ns.terminate()
+	defer res.Close()
+
+	lh := newLineHolder()
 	errChan := make(chan error, 1)
+	ch, err := res.ReadStreamJSON()
+	if err != nil {
+		return err
+	}
 	go func() {
 		for {
 			v, err := data.NewValue(<-ch)
@@ -63,6 +64,19 @@ func Run(c *cli.Context) error {
 				errChan <- err
 				return
 			}
+		}
+	}()
+
+	// setup termbox when all preparations are done, because initializing
+	// termbox sometimes destroys terminal UI.
+	if err := termbox.Init(); err != nil {
+		return fmt.Errorf("fail to initialize termbox, %v", err)
+	}
+	defer termbox.Close()
+	eventQueue := make(chan termbox.Event)
+	go func() {
+		for {
+			eventQueue <- termbox.PollEvent()
 		}
 	}()
 

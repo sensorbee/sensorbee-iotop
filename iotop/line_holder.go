@@ -3,6 +3,7 @@ package iotop
 import (
 	"bytes"
 	"fmt"
+	"sync"
 	"text/tabwriter"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 )
 
 type lineHolder struct {
+	rwm     sync.RWMutex
 	srcs    []sourceLine
 	boxes   []boxLine
 	sinks   []sinkLine
@@ -37,6 +39,8 @@ func (h *lineHolder) clear() {
 }
 
 func (h *lineHolder) push(m data.Map) error {
+	h.rwm.Lock()
+	defer h.rwm.Unlock()
 	ns := &nodeStatus{}
 	if err := h.decoder.Decode(m, ns); err != nil {
 		return err
@@ -89,6 +93,8 @@ func (h *lineHolder) push(m data.Map) error {
 }
 
 func (h *lineHolder) flush() string {
+	h.rwm.RLock()
+	defer h.rwm.RUnlock()
 	b := bytes.NewBuffer(nil)
 	w := tabwriter.NewWriter(b, 0, 0, 1, ' ', 0)
 	fmt.Fprintln(w, "SENDER\tSTYPE\tRCVER\tRTYPE\tSQSIZE\tSQNUM\tSNUM\tRQSIZE\tRQNUM\tRNUM\tINOUT")

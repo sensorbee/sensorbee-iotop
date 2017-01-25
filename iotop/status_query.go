@@ -6,78 +6,73 @@ import (
 	"gopkg.in/sensorbee/sensorbee.v0/client"
 )
 
-type nodeStatuser struct {
-	req  *client.Requester
-	res  *client.Response
-	path string
-	stop chan struct{}
+// StatusRequester is an interface for streaming node status.
+type StatusRequester interface {
+	PostQuery(string) (*client.Response, error)
 }
 
-func newNodeStatuser(addr, apiVer, tpl string) (*nodeStatuser, error) {
-	req, err := client.NewRequester(addr, apiVer)
+type nodeStatusRequester struct {
+	req  *client.Requester
+	path string
+}
+
+func newNodeStatusRequester(addr, ver, tpl string) (StatusRequester, error) {
+	req, err := client.NewRequester(addr, ver)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create new requester, %v", err)
+		return nil, fmt.Errorf(
+			"cannot create a new requester for node monitoring, %v", err)
 	}
 	path := "/topologies/" + tpl + "/queries"
-	return &nodeStatuser{
+	return &nodeStatusRequester{
 		req:  req,
 		path: path,
-		stop: make(chan struct{}, 1),
 	}, nil
 }
 
-func (n *nodeStatuser) selectNodeStatus(interval float64) (
-	<-chan interface{}, error) {
-	createNodeStatusSourceBQL := fmt.Sprintf(
-		`CREATE SOURCE iotop_ns TYPE node_statuses WITH interval = %f;`, interval)
-	res, err := n.postQuery(createNodeStatusSourceBQL)
-	if err != nil {
-		return nil, fmt.Errorf("request failed to create 'node_statuses' source, %v", err)
-	}
-	defer res.Close()
-	if err := checkResponseError(res); err != nil {
-		return nil, err
-	}
-
-	selectNodeStatusBQL := `SELECT RSTREAM *, ts() FROM iotop_ns [RANGE 1 TUPLES];`
-	sres, err := n.postQuery(selectNodeStatusBQL)
-	if err != nil {
-		return nil, fmt.Errorf("request failed to stream 'node_statuses', %v", err)
-	}
-
-	var serr error
-	defer func() {
-		if serr != nil {
-			sres.Close()
-		}
-	}()
-	if serr = checkResponseError(sres); serr != nil {
-		return nil, serr
-	}
-	if !sres.IsStream() {
-		serr = fmt.Errorf("failed to stream 'SELECT' query")
-		return nil, serr
-	}
-	ch, err := sres.ReadStreamJSON()
-	if err != nil {
-		serr = fmt.Errorf("cannot read stream channel, %v", err)
-		return nil, serr
-	}
-	n.res = sres
-	return ch, nil
-}
-
-func (n *nodeStatuser) terminate() {
-	// skip catch error
-	defer n.res.Close()
-	dropNodeStatusSouceBQL := `DROP SOURCE iotop_ns;`
-	n.postQuery(dropNodeStatusSouceBQL)
-}
-
-func (n *nodeStatuser) postQuery(bql string) (*client.Response, error) {
+func (n *nodeStatusRequester) PostQuery(bql string) (*client.Response, error) {
 	return n.req.Do(client.Post, n.path, map[string]interface{}{
 		"queries": bql,
 	})
+}
+
+func setupStatusQuery(req StatusRequester, interval float64) error {
+	createNodeStatusSourceBQL := fmt.Sprintf(
+		`CREATE SOURCE iotop_ns TYPE node_statuses WITH interval = %f;`, interval)
+	res, err := req.PostQuery(createNodeStatusSourceBQL)
+	if err != nil {
+		return fmt.Errorf("request failed to create 'node_statuses' source, %v", err)
+	}
+	defer res.Close()
+	if err := checkResponseError(res); err != nil {
+		return err
+	}
+	return nil
+}
+
+func selectNodeStatus(req StatusRequester) (res *client.Response, err error) {
+	selectNodeStatusBQL := `SELECT RSTREAM *, ts() FROM iotop_ns [RANGE 1 TUPLES];`
+	res, err = req.PostQuery(selectNodeStatusBQL)
+	if err != nil {
+		return nil, fmt.Errorf("request failed to stream 'node_statuses', %v", err)
+	}
+	defer func() {
+		if err != nil {
+			res.Close()
+		}
+	}()
+	if err = checkResponseError(res); err != nil {
+		return nil, err
+	}
+	if !res.IsStream() {
+		err = fmt.Errorf("failed to stream 'SELECT' query")
+		return nil, err
+	}
+	return
+}
+
+func tearDownStatusQuery(req StatusRequester) error {
+	_, err := req.PostQuery(`DROP SOURCE iotop_ns;`)
+	return err
 }
 
 func checkResponseError(res *client.Response) error {

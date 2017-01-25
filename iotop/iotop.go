@@ -1,15 +1,16 @@
 package iotop
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"gopkg.in/sensorbee/sensorbee.v0/data"
+	cli "gopkg.in/urfave/cli.v1"
 
 	"github.com/mattn/go-runewidth"
-	"github.com/nsf/termbox-go"
-	"gopkg.in/urfave/cli.v1"
+	termbox "github.com/nsf/termbox-go"
 )
 
 // Run 'sensorbee-iotop' command.
@@ -50,7 +51,12 @@ func Monitor(d float64, req StatusRequester) error {
 	}
 	go func() {
 		for {
-			v, err := data.NewValue(<-ch)
+			iv, ok := <-ch
+			if !ok || iv == nil {
+				errChan <- errors.New("monitoring stream is closed")
+				return
+			}
+			v, err := data.NewValue(iv)
 			if err != nil {
 				errChan <- err
 				return
@@ -67,39 +73,59 @@ func Monitor(d float64, req StatusRequester) error {
 		}
 	}()
 
-	// setup termbox when all preparations are done, because initializing
+	ms := &monitoringState{
+		d: time.Duration(d*1000) * time.Millisecond,
+	}
+	eb := &editBox{}
+
+	// setup termbox after all preparations are done, because initializing
 	// termbox sometimes destroys terminal UI.
 	if err := termbox.Init(); err != nil {
 		return fmt.Errorf("fail to initialize termbox, %v", err)
 	}
 	defer termbox.Close()
-	eventQueue := make(chan termbox.Event)
-	go func() {
-		for {
-			eventQueue <- termbox.PollEvent()
-		}
-	}()
 
-	tick := time.Tick(time.Duration(d*1000) * time.Millisecond)
+	pause := make(chan struct{}, 1)
 	go func() {
 		for {
 			draw(lh.flush())
-			<-tick
+			select {
+			case <-time.After(ms.d):
+			case <-pause:
+				<-pause
+			}
 		}
 	}()
 
 	running := true
+	evChan := make(chan termbox.Event)
 	for running {
+		go func() {
+			evChan <- termbox.PollEvent()
+		}()
 		select {
-		case ev := <-eventQueue:
-			if ev.Type == termbox.EventKey &&
-				(ev.Key == termbox.KeyCtrlC || ev.Ch == 'q') {
-				running = false
-			}
 		case err := <-errChan:
 			return err
-		default:
-			// nothing to do
+		case ev := <-evChan:
+			switch ev.Type {
+			case termbox.EventKey:
+				switch ev.Key {
+				case termbox.KeyCtrlC:
+					running = false
+				default:
+				}
+				switch ev.Ch {
+				case 'q':
+					running = false
+				case 'd':
+					pause <- struct{}{}
+					pause <- updateInterval(ms, eb)
+				default:
+				}
+			case termbox.EventError:
+				return fmt.Errorf("Cannot get key events to operate, %v",
+					ev.Err)
+			}
 		}
 	}
 	return nil
@@ -110,7 +136,7 @@ const iotopTerminalColor = termbox.ColorDefault
 func draw(lines string) {
 	termbox.Clear(iotopTerminalColor, iotopTerminalColor)
 	for i, line := range strings.Split(lines, "\n") {
-		tbprint(0, i, iotopTerminalColor, iotopTerminalColor, line)
+		tbprint(0, i+1, iotopTerminalColor, iotopTerminalColor, line)
 	}
 	termbox.Flush()
 }

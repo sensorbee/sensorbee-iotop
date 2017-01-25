@@ -6,6 +6,10 @@ so interface and API will be changed
 
 ## build & run
 
+```bash
+$ go get github.com/sensorbee/sensorbee-iotop
+```
+
 **single binary version**
 
 ```bash

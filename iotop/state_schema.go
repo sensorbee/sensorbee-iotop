@@ -1,6 +1,7 @@
 package iotop
 
 import (
+	"sort"
 	"time"
 
 	"gopkg.in/sensorbee/sensorbee.v0/data"
@@ -45,10 +46,38 @@ type generalLine struct {
 	state    string
 }
 
+type sourceLineMap map[string]sourceLine
+
+func (lm sourceLineMap) sortedKeys() []string {
+	l := len(lm)
+	keys := make([]string, l, l)
+	i := 0
+	for k := range lm {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 type sourceLine struct {
 	*generalLine
 	out     int64
 	dropped int64
+}
+
+type boxLineMap map[string]boxLine
+
+func (lm boxLineMap) sortedKeys() []string {
+	l := len(lm)
+	keys := make([]string, l, l)
+	i := 0
+	for k := range lm {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 type boxLine struct {
@@ -59,10 +88,38 @@ type boxLine struct {
 	nerror         int64
 }
 
+type sinkLineMap map[string]sinkLine
+
+func (lm sinkLineMap) sortedKeys() []string {
+	l := len(lm)
+	keys := make([]string, l, l)
+	i := 0
+	for k := range lm {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 type sinkLine struct {
 	*generalLine
 	in     int64
 	nerror int64
+}
+
+type edgeLineMap map[string]*edgeLine
+
+func (lm edgeLineMap) sortedKeys() []string {
+	l := len(lm)
+	keys := make([]string, l, l)
+	i := 0
+	for k := range lm {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 type edgeLine struct {

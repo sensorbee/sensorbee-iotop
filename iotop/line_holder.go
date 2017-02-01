@@ -195,7 +195,8 @@ func (h *lineHolder) flush(ms *monitoringState) string {
 
 func (h *lineHolder) printEdgeLines(w *tabwriter.Writer, ms *monitoringState) {
 	fmt.Fprintln(w, "SENDER\tSTYPE\tRCVER\tRTYPE\tSQSIZE\tSQNUM\tSNUM\tRQSIZE\tRQNUM\tRNUM\tINOUT")
-	for name, l := range h.edges {
+	for _, name := range edgeLineMap(h.edges).sortedKeys() {
+		l := h.edges[name]
 		var values string
 		if prev, ok := h.prev.edges[name]; ok && !ms.absFlag {
 			inout := float64(l.inOut-prev.inOut) / ms.d.Seconds()
@@ -215,7 +216,8 @@ func (h *lineHolder) printEdgeLines(w *tabwriter.Writer, ms *monitoringState) {
 
 func (h *lineHolder) printSrcLines(w *tabwriter.Writer, ms *monitoringState) {
 	fmt.Fprintln(w, "NAME\tNTYPE\tSTATE\tOUT\tDROP")
-	for name, l := range h.srcs {
+	for _, name := range sourceLineMap(h.srcs).sortedKeys() {
+		l := h.srcs[name]
 		var values string
 		if prev, ok := h.prev.srcs[name]; ok && !ms.absFlag {
 			out := float64(l.out-prev.out) / ms.d.Seconds()
@@ -231,7 +233,8 @@ func (h *lineHolder) printSrcLines(w *tabwriter.Writer, ms *monitoringState) {
 
 func (h *lineHolder) printBoxLines(w *tabwriter.Writer, ms *monitoringState) {
 	fmt.Fprintln(w, "NAME\tNTYPE\tSTATE\tINOUT\tDROP\tERR")
-	for name, l := range h.boxes {
+	for _, name := range boxLineMap(h.boxes).sortedKeys() {
+		l := h.boxes[name]
 		var values string
 		if prev, ok := h.prev.boxes[name]; ok && !ms.absFlag {
 			inout := float64(l.inOut-prev.inOut) / ms.d.Seconds()
@@ -247,7 +250,8 @@ func (h *lineHolder) printBoxLines(w *tabwriter.Writer, ms *monitoringState) {
 
 func (h *lineHolder) printSinkLines(w *tabwriter.Writer, ms *monitoringState) {
 	fmt.Fprintln(w, "NAME\tNTYPE\tSTATE\tIN\tERR")
-	for name, l := range h.sinks {
+	for _, name := range sinkLineMap(h.sinks).sortedKeys() {
+		l := h.sinks[name]
 		var values string
 		if prev, ok := h.prev.sinks[name]; ok && !ms.absFlag {
 			in := float64(l.in-prev.in) / ms.d.Seconds()

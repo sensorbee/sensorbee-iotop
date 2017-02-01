@@ -46,6 +46,7 @@ func (eb *editBox) reset() {
 }
 
 func (eb *editBox) start(prefix string) (string, error) {
+	defer eb.reset()
 	eb.redrawAll(prefix)
 
 	running := true
@@ -86,7 +87,8 @@ func (eb *editBox) start(prefix string) (string, error) {
 		}
 		eb.redrawAll(prefix)
 	}
-	return string(eb.text), nil
+	text := string(eb.text)
+	return text, nil
 }
 
 func (eb *editBox) draw(x, y, w, h int) {

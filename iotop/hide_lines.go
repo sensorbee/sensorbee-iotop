@@ -8,9 +8,9 @@ import (
 
 func hideNodeLines(ms *monitoringState, eb *editBox) (done struct{}) {
 	done = struct{}{}
+	defer eb.reset()
 
 	in, err := eb.start("Which user (blank for all) ")
-	eb.reset()
 	if err != nil {
 		eb.redrawAll(err.Error())
 		<-time.After(2 * time.Second)

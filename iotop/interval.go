@@ -8,9 +8,9 @@ import (
 
 func updateInterval(ms *monitoringState, eb *editBox) (done struct{}) {
 	done = struct{}{}
+	defer eb.reset()
 
 	in, err := eb.start(fmt.Sprintf("Change delay from %v to ", ms.d))
-	eb.reset()
 	if err != nil {
 		eb.redrawAll(err.Error())
 		<-time.After(2 * time.Second)

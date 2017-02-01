@@ -88,7 +88,7 @@ func Monitor(d float64, req StatusRequester) error {
 	pause := make(chan struct{}, 1)
 	go func() {
 		for {
-			draw(lh.flush())
+			draw(lh.flush(ms))
 			select {
 			case <-time.After(ms.d):
 			case <-pause:

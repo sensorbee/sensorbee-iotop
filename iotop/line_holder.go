@@ -10,31 +10,46 @@ import (
 	"gopkg.in/sensorbee/sensorbee.v0/data"
 )
 
+type prevLineHolder struct {
+	srcs  map[string]sourceLine
+	boxes map[string]boxLine
+	sinks map[string]sinkLine
+	edges map[string]*edgeLine
+}
+
 type lineHolder struct {
 	rwm     sync.RWMutex
-	srcs    []sourceLine
-	boxes   []boxLine
-	sinks   []sinkLine
+	srcs    map[string]sourceLine
+	boxes   map[string]boxLine
+	sinks   map[string]sinkLine
 	edges   map[string]*edgeLine
 	current time.Time
+	prev    *prevLineHolder // not use lineHolder not to share other parameter
 	decoder *data.Decoder
 }
 
 func newLineHolder() *lineHolder {
+	prev := &prevLineHolder{
+		srcs:  map[string]sourceLine{},
+		boxes: map[string]boxLine{},
+		sinks: map[string]sinkLine{},
+		edges: map[string]*edgeLine{},
+	}
 	return &lineHolder{
-		srcs:    []sourceLine{},
-		boxes:   []boxLine{},
-		sinks:   []sinkLine{},
+		srcs:    map[string]sourceLine{},
+		boxes:   map[string]boxLine{},
+		sinks:   map[string]sinkLine{},
 		edges:   map[string]*edgeLine{},
 		current: time.Now(),
+		prev:    prev,
 		decoder: data.NewDecoder(nil),
 	}
 }
 
-func (h *lineHolder) clear() {
-	h.srcs = []sourceLine{}
-	h.boxes = []boxLine{}
-	h.sinks = []sinkLine{}
+func (h *lineHolder) clear() { // hand GC to clear old maps
+	h.srcs = map[string]sourceLine{}
+	h.boxes = map[string]boxLine{}
+	h.sinks = map[string]sinkLine{}
 	h.edges = map[string]*edgeLine{}
 }
 
@@ -47,6 +62,10 @@ func (h *lineHolder) push(m data.Map) error {
 	}
 
 	if h.current != ns.Timestamp {
+		h.prev.srcs = h.srcs
+		h.prev.boxes = h.boxes
+		h.prev.sinks = h.sinks
+		h.prev.edges = h.edges
 		h.clear()
 		h.current = ns.Timestamp
 	}
@@ -63,7 +82,7 @@ func (h *lineHolder) push(m data.Map) error {
 			out:         ns.OutputStats.NumSentTotal,
 			dropped:     ns.OutputStats.NumDropped,
 		}
-		h.srcs = append(h.srcs, line)
+		h.srcs[ns.NodeName] = line
 		h.setSourcePipeStatus(ns.NodeName, ns.NodeType, ns.OutputStats.Outputs)
 
 	case "box":
@@ -76,7 +95,7 @@ func (h *lineHolder) push(m data.Map) error {
 		}
 		// TODO: process time
 		// TODO: BQL statement, when SELETE query
-		h.boxes = append(h.boxes, line)
+		h.boxes[ns.NodeName] = line
 		h.setSourcePipeStatus(ns.NodeName, ns.NodeType, ns.OutputStats.Outputs)
 		h.setDestinationPipeStatus(ns.NodeName, ns.NodeType, ns.InputStats.Inputs)
 
@@ -86,44 +105,74 @@ func (h *lineHolder) push(m data.Map) error {
 			in:          ns.InputStats.NumReceivedTotal,
 			nerror:      ns.InputStats.NumErrors,
 		}
-		h.sinks = append(h.sinks, line)
+		h.sinks[ns.NodeName] = line
 		h.setDestinationPipeStatus(ns.NodeName, ns.NodeType, ns.InputStats.Inputs)
 	}
 	return nil
 }
 
-func (h *lineHolder) flush() string {
+func (h *lineHolder) flush(ms *monitoringState) string {
 	h.rwm.RLock()
 	defer h.rwm.RUnlock()
 	b := bytes.NewBuffer(nil)
 	w := tabwriter.NewWriter(b, 0, 0, 1, ' ', 0)
 	fmt.Fprintln(w, "SENDER\tSTYPE\tRCVER\tRTYPE\tSQSIZE\tSQNUM\tSNUM\tRQSIZE\tRQNUM\tRNUM\tINOUT")
-	for _, l := range h.edges {
-		values := fmt.Sprintf("%v\t%v\t%v\t%v\t%d\t%d\t%d\t%d\t%d\t%d\t%d",
-			l.senderName, l.senderNodeType, l.receiverName,
-			l.receiverNodeType, l.senderQueueSize, l.senderQueued, l.sent,
-			l.receiverQueueSize, l.receiverQueued, l.received, l.inOut)
+	for name, l := range h.edges {
+		var values string
+		if prev, ok := h.prev.edges[name]; ok {
+			inout := float64(l.inOut-prev.inOut) / ms.d.Seconds()
+			values = fmt.Sprintf("%v\t%v\t%v\t%v\t%d\t%d\t%d\t%d\t%d\t%d\t%.2f",
+				l.senderName, l.senderNodeType, l.receiverName,
+				l.receiverNodeType, l.senderQueueSize, l.senderQueued, l.sent,
+				l.receiverQueueSize, l.receiverQueued, l.received, inout)
+		} else {
+			values = fmt.Sprintf("%v\t%v\t%v\t%v\t%d\t%d\t%d\t%d\t%d\t%d\t[%d]",
+				l.senderName, l.senderNodeType, l.receiverName,
+				l.receiverNodeType, l.senderQueueSize, l.senderQueued, l.sent,
+				l.receiverQueueSize, l.receiverQueued, l.received, l.inOut)
+		}
 		fmt.Fprintln(w, values)
 	}
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "NAME\tNTYPE\tSTATE\tOUT\tDROP")
-	for _, l := range h.srcs {
-		values := fmt.Sprintf("%v\t%v\t%v\t%d\t%d",
-			l.name, l.nodeType, l.state, l.out, l.dropped)
+	for name, l := range h.srcs {
+		var values string
+		if prev, ok := h.prev.srcs[name]; ok {
+			out := float64(l.out-prev.out) / ms.d.Seconds()
+			values = fmt.Sprintf("%v\t%v\t%v\t%.2f\t%d",
+				l.name, l.nodeType, l.state, out, l.dropped)
+		} else {
+			values = fmt.Sprintf("%v\t%v\t%v\t[%d]\t%d",
+				l.name, l.nodeType, l.state, l.out, l.dropped)
+		}
 		fmt.Fprintln(w, values)
 	}
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "NAME\tNTYPE\tSTATE\tINOUT\tDROP\tERR")
-	for _, l := range h.boxes {
-		values := fmt.Sprintf("%v\t%v\t%v\t%d\t%d\t%d",
-			l.name, l.nodeType, l.state, l.inOut, l.dropped, l.nerror)
+	for name, l := range h.boxes {
+		var values string
+		if prev, ok := h.prev.boxes[name]; ok {
+			inout := float64(l.inOut-prev.inOut) / ms.d.Seconds()
+			values = fmt.Sprintf("%v\t%v\t%v\t%.2f\t%d\t%d",
+				l.name, l.nodeType, l.state, inout, l.dropped, l.nerror)
+		} else {
+			values = fmt.Sprintf("%v\t%v\t%v\t[%d]\t%d\t%d",
+				l.name, l.nodeType, l.state, l.inOut, l.dropped, l.nerror)
+		}
 		fmt.Fprintln(w, values)
 	}
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "NAME\tNTYPE\tSTATE\tIN\tERR")
-	for _, l := range h.sinks {
-		values := fmt.Sprintf("%v\t%v\t%v\t%d\t%d",
-			l.name, l.nodeType, l.state, l.in, l.nerror)
+	for name, l := range h.sinks {
+		var values string
+		if prev, ok := h.prev.sinks[name]; ok {
+			in := float64(l.in-prev.in) / ms.d.Seconds()
+			values = fmt.Sprintf("%v\t%v\t%v\t%.2f\t%d",
+				l.name, l.nodeType, l.state, in, l.nerror)
+		} else {
+			values = fmt.Sprintf("%v\t%v\t%v\t[%d]\t%d",
+				l.name, l.nodeType, l.state, l.in, l.nerror)
+		}
 		fmt.Fprintln(w, values)
 	}
 

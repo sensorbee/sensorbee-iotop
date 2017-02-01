@@ -3,5 +3,6 @@ package iotop
 import "time"
 
 type monitoringState struct {
-	d time.Duration
+	d       time.Duration
+	absFlag bool
 }

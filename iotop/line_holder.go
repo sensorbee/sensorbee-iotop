@@ -119,7 +119,7 @@ func (h *lineHolder) flush(ms *monitoringState) string {
 	fmt.Fprintln(w, "SENDER\tSTYPE\tRCVER\tRTYPE\tSQSIZE\tSQNUM\tSNUM\tRQSIZE\tRQNUM\tRNUM\tINOUT")
 	for name, l := range h.edges {
 		var values string
-		if prev, ok := h.prev.edges[name]; ok {
+		if prev, ok := h.prev.edges[name]; ok && !ms.absFlag {
 			inout := float64(l.inOut-prev.inOut) / ms.d.Seconds()
 			values = fmt.Sprintf("%v\t%v\t%v\t%v\t%d\t%d\t%d\t%d\t%d\t%d\t%.2f",
 				l.senderName, l.senderNodeType, l.receiverName,
@@ -137,7 +137,7 @@ func (h *lineHolder) flush(ms *monitoringState) string {
 	fmt.Fprintln(w, "NAME\tNTYPE\tSTATE\tOUT\tDROP")
 	for name, l := range h.srcs {
 		var values string
-		if prev, ok := h.prev.srcs[name]; ok {
+		if prev, ok := h.prev.srcs[name]; ok && !ms.absFlag {
 			out := float64(l.out-prev.out) / ms.d.Seconds()
 			values = fmt.Sprintf("%v\t%v\t%v\t%.2f\t%d",
 				l.name, l.nodeType, l.state, out, l.dropped)
@@ -151,7 +151,7 @@ func (h *lineHolder) flush(ms *monitoringState) string {
 	fmt.Fprintln(w, "NAME\tNTYPE\tSTATE\tINOUT\tDROP\tERR")
 	for name, l := range h.boxes {
 		var values string
-		if prev, ok := h.prev.boxes[name]; ok {
+		if prev, ok := h.prev.boxes[name]; ok && !ms.absFlag {
 			inout := float64(l.inOut-prev.inOut) / ms.d.Seconds()
 			values = fmt.Sprintf("%v\t%v\t%v\t%.2f\t%d\t%d",
 				l.name, l.nodeType, l.state, inout, l.dropped, l.nerror)
@@ -165,7 +165,7 @@ func (h *lineHolder) flush(ms *monitoringState) string {
 	fmt.Fprintln(w, "NAME\tNTYPE\tSTATE\tIN\tERR")
 	for name, l := range h.sinks {
 		var values string
-		if prev, ok := h.prev.sinks[name]; ok {
+		if prev, ok := h.prev.sinks[name]; ok && !ms.absFlag {
 			in := float64(l.in-prev.in) / ms.d.Seconds()
 			values = fmt.Sprintf("%v\t%v\t%v\t%.2f\t%d",
 				l.name, l.nodeType, l.state, in, l.nerror)

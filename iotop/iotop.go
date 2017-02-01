@@ -120,6 +120,10 @@ func Monitor(d float64, req StatusRequester) error {
 				case 'd':
 					pause <- struct{}{}
 					pause <- updateInterval(ms, eb)
+				case 'c':
+					pause <- struct{}{}
+					ms.absFlag = !ms.absFlag
+					pause <- struct{}{}
 				default:
 				}
 			case termbox.EventError:

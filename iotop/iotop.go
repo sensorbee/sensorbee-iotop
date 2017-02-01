@@ -124,10 +124,13 @@ func Monitor(d float64, req StatusRequester) error {
 					pause <- struct{}{}
 					ms.absFlag = !ms.absFlag
 					pause <- struct{}{}
+				case 'u':
+					pause <- struct{}{}
+					pause <- hideNodeLines(ms, eb)
 				default:
 				}
 			case termbox.EventError:
-				return fmt.Errorf("Cannot get key events to operate, %v",
+				return fmt.Errorf("cannot get key events to operate, %v",
 					ev.Err)
 			}
 		}

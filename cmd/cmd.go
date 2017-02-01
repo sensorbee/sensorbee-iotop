@@ -34,13 +34,22 @@ var CmdFlags = []cli.Flag{
 		Value: "v1",
 		Usage: "target API version",
 	},
+	cli.StringFlag{
+		Name:  "topology,t",
+		Usage: "the SensorBee topology to use",
+	},
 	cli.Float64Flag{
 		Name:  "d",
 		Value: 5.,
 		Usage: "interval time [sec]",
 	},
 	cli.StringFlag{
-		Name:  "topology,t",
-		Usage: "the SensorBee topology to use",
+		Name:  "u",
+		Value: "",
+		Usage: "visible or not, set node type to show",
+	},
+	cli.BoolFlag{
+		Name:  "c",
+		Usage: "show in/out count in absolute value or not",
 	},
 }

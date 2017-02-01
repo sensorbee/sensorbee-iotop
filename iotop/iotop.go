@@ -24,15 +24,15 @@ func Run(c *cli.Context) error {
 		return err
 	}
 
-	d := c.Float64("d")
-	if d < 1.0 {
-		return fmt.Errorf("interval must be over than 1[sec]")
+	ms, err := SetUpMonitoringState(c)
+	if err != nil {
+		return err
 	}
-	return Monitor(d, req)
+	return Monitor(ms, req)
 }
 
 // Monitor I/O of each nodes.
-func Monitor(d float64, req StatusRequester) error {
+func Monitor(ms *MonitoringState, req StatusRequester) error {
 	if err := setupStatusQuery(req, 1.0); err != nil {
 		return err
 	}
@@ -73,9 +73,6 @@ func Monitor(d float64, req StatusRequester) error {
 		}
 	}()
 
-	ms := &monitoringState{
-		d: time.Duration(d*1000) * time.Millisecond,
-	}
 	eb := &editBox{}
 
 	// setup termbox after all preparations are done, because initializing

@@ -167,7 +167,7 @@ func (h *lineHolder) setDestinationPipeStatus(name, nodeType string, inputs data
 	}
 }
 
-func (h *lineHolder) flush(ms *monitoringState) string {
+func (h *lineHolder) flush(ms *MonitoringState) string {
 	h.rwm.RLock()
 	defer h.rwm.RUnlock()
 	b := bytes.NewBuffer(nil)
@@ -193,7 +193,7 @@ func (h *lineHolder) flush(ms *monitoringState) string {
 	return b.String()
 }
 
-func (h *lineHolder) printEdgeLines(w *tabwriter.Writer, ms *monitoringState) {
+func (h *lineHolder) printEdgeLines(w *tabwriter.Writer, ms *MonitoringState) {
 	fmt.Fprintln(w, "SENDER\tSTYPE\tRCVER\tRTYPE\tSQSIZE\tSQNUM\tSNUM\tRQSIZE\tRQNUM\tRNUM\tINOUT")
 	for _, name := range edgeLineMap(h.edges).sortedKeys() {
 		l := h.edges[name]
@@ -214,7 +214,7 @@ func (h *lineHolder) printEdgeLines(w *tabwriter.Writer, ms *monitoringState) {
 	}
 }
 
-func (h *lineHolder) printSrcLines(w *tabwriter.Writer, ms *monitoringState) {
+func (h *lineHolder) printSrcLines(w *tabwriter.Writer, ms *MonitoringState) {
 	fmt.Fprintln(w, "NAME\tNTYPE\tSTATE\tOUT\tDROP")
 	for _, name := range sourceLineMap(h.srcs).sortedKeys() {
 		l := h.srcs[name]
@@ -231,7 +231,7 @@ func (h *lineHolder) printSrcLines(w *tabwriter.Writer, ms *monitoringState) {
 	}
 }
 
-func (h *lineHolder) printBoxLines(w *tabwriter.Writer, ms *monitoringState) {
+func (h *lineHolder) printBoxLines(w *tabwriter.Writer, ms *MonitoringState) {
 	fmt.Fprintln(w, "NAME\tNTYPE\tSTATE\tINOUT\tDROP\tERR")
 	for _, name := range boxLineMap(h.boxes).sortedKeys() {
 		l := h.boxes[name]
@@ -248,7 +248,7 @@ func (h *lineHolder) printBoxLines(w *tabwriter.Writer, ms *monitoringState) {
 	}
 }
 
-func (h *lineHolder) printSinkLines(w *tabwriter.Writer, ms *monitoringState) {
+func (h *lineHolder) printSinkLines(w *tabwriter.Writer, ms *MonitoringState) {
 	fmt.Fprintln(w, "NAME\tNTYPE\tSTATE\tIN\tERR")
 	for _, name := range sinkLineMap(h.sinks).sortedKeys() {
 		l := h.sinks[name]

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func updateInterval(ms *monitoringState, eb *editBox) (done struct{}) {
+func updateInterval(ms *MonitoringState, eb *editBox) (done struct{}) {
 	done = struct{}{}
 	defer eb.reset()
 

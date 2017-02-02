@@ -25,6 +25,11 @@ func updateInterval(ms *MonitoringState, eb *editBox) (done struct{}) {
 		<-time.After(2 * time.Second)
 		return
 	}
+	if interval < 1.0 {
+		eb.redrawAll("Unacceptable interval time, must be over than 1[sec]")
+		<-time.After(2 * time.Second)
+		return
+	}
 	ms.d = time.Duration(interval*1000) * time.Millisecond
 	return
 }
